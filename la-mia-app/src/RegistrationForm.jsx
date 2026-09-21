@@ -1,18 +1,19 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import './RegistrationForm.css';
 
 const SPECIALIZATIONS = ['Full Stack', 'Frontend', 'Backend'];
 
-// Caratteri validi (dal suggerimento)
 const letters = 'abcdefghijklmnopqrstuvwxyz';
 const numbers = '0123456789';
 const symbols = "!@#$%^&*()-_=+[]{}|;:'\\\",.<>?/`~";
 
-// Controlla se una stringa contiene almeno un carattere di una categoria
 const hasCharFrom = (str, set) =>
     [...str.toLowerCase()].some((ch) => set.includes(ch));
 
-// --- Regole di validazione live ---
+// --- Regole di validazione (invariate) ---
+const validateFullName = (value) =>
+    value.trim() ? '' : 'Il nome completo è obbligatorio';
+
 const validateUsername = (value) => {
     if (!value) return 'Username obbligatorio';
     if (value.length < 6) return 'Minimo 6 caratteri';
@@ -31,6 +32,15 @@ const validatePassword = (value) => {
     return '';
 };
 
+const validateSpecialization = (value) =>
+    value ? '' : 'Seleziona una specializzazione';
+
+const validateYears = (value) => {
+    if (value === '') return 'Campo obbligatorio';
+    if (Number(value) <= 0) return 'Inserisci un numero positivo';
+    return '';
+};
+
 const validateDescription = (value) => {
     const trimmed = value.trim();
     if (!trimmed) return 'Descrizione obbligatoria';
@@ -39,93 +49,94 @@ const validateDescription = (value) => {
     return '';
 };
 
-const INITIAL_FORM = {
-    fullName: '',
+// Stato iniziale SOLO per i campi controllati
+const INITIAL_CONTROLLED = {
     username: '',
     password: '',
-    specialization: '',
-    yearsOfExperience: '',
     description: '',
 };
 
 export default function RegistrationForm() {
-    const [formData, setFormData] = useState(INITIAL_FORM);
-    const [errors, setErrors] = useState({});
+    // --- Campi CONTROLLATI (con feedback live) ---
+    const [controlled, setControlled] = useState(INITIAL_CONTROLLED);
     const [touched, setTouched] = useState({});
+    const [errors, setErrors] = useState({});
 
-    // Handler generico
+    // --- Campi NON CONTROLLATI (valore letto solo al submit) ---
+    const fullNameRef = useRef(null);
+    const specializationRef = useRef(null);
+    const yearsRef = useRef(null);
+
+    // Handler per campi controllati
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
+        setControlled((prev) => ({ ...prev, [name]: value }));
     };
 
-    // Al blur (uscita dal campo) attivo la validazione live
     const handleBlur = (e) => {
         const { name } = e.target;
         setTouched((prev) => ({ ...prev, [name]: true }));
     };
 
-    // Calcola l'errore di un campo "live" solo dopo che è stato toccato
+    // Errore live per campi controllati
     const getLiveError = (name) => {
         if (!touched[name]) return '';
         switch (name) {
-            case 'username': return validateUsername(formData.username);
-            case 'password': return validatePassword(formData.password);
-            case 'description': return validateDescription(formData.description);
+            case 'username': return validateUsername(controlled.username);
+            case 'password': return validatePassword(controlled.password);
+            case 'description': return validateDescription(controlled.description);
             default: return '';
         }
     };
 
-    // Validazione completa al submit (tutti i campi)
-    const validateAll = () => {
-        const newErrors = {};
-        if (!formData.fullName.trim()) newErrors.fullName = 'Il nome completo è obbligatorio';
-        if (!formData.username.trim()) newErrors.username = 'Lo username è obbligatorio';
-        else {
-            const e = validateUsername(formData.username);
-            if (e) newErrors.username = e;
-        }
-        if (!formData.password) newErrors.password = 'La password è obbligatoria';
-        else {
-            const e = validatePassword(formData.password);
-            if (e) newErrors.password = e;
-        }
-        if (!formData.specialization) newErrors.specialization = 'Seleziona una specializzazione';
-        if (formData.yearsOfExperience === '') newErrors.yearsOfExperience = 'Campo obbligatorio';
-        else if (Number(formData.yearsOfExperience) <= 0)
-            newErrors.yearsOfExperience = 'Inserisci un numero positivo';
-        if (!formData.description.trim()) newErrors.description = 'La descrizione è obbligatoria';
-        else {
-            const e = validateDescription(formData.description);
-            if (e) newErrors.description = e;
-        }
-        return newErrors;
-    };
-
+    // Al submit leggiamo i valori dai ref e validiamo TUTTO
     const handleSubmit = (e) => {
         e.preventDefault();
-        const validationErrors = validateAll();
-        setErrors(validationErrors);
 
-        // Segna tutti i campi come "toccati" così gli errori live appaiono
-        setTouched({
-            username: true,
-            password: true,
-            description: true,
-        });
+        // Recupera i valori dei campi non controllati dai ref
+        const formValues = {
+            fullName: fullNameRef.current.value,
+            username: controlled.username,               // controllato
+            password: controlled.password,               // controllato
+            specialization: specializationRef.current.value,
+            yearsOfExperience: yearsRef.current.value,
+            description: controlled.description,         // controllato
+        };
 
-        if (Object.keys(validationErrors).length > 0) return;
+        // Valida tutti i campi
+        const validationErrors = {
+            fullName: validateFullName(formValues.fullName),
+            username: validateUsername(formValues.username),
+            password: validatePassword(formValues.password),
+            specialization: validateSpecialization(formValues.specialization),
+            yearsOfExperience: validateYears(formValues.yearsOfExperience),
+            description: validateDescription(formValues.description),
+        };
 
-        console.log('Dati del form:', formData);
+        // Rimuove le voci vuote
+        const cleanedErrors = Object.fromEntries(
+            Object.entries(validationErrors).filter(([, msg]) => msg)
+        );
+
+        setErrors(cleanedErrors);
+        setTouched({ username: true, password: true, description: true });
+
+        if (Object.keys(cleanedErrors).length > 0) return;
+
+        console.log('Dati del form:', formValues);
     };
 
     const handleReset = () => {
-        setFormData(INITIAL_FORM);
+        setControlled(INITIAL_CONTROLLED);
         setErrors({});
         setTouched({});
+
+        // Reset manuale dei ref
+        fullNameRef.current.value = '';
+        specializationRef.current.value = '';
+        yearsRef.current.value = '';
     };
 
-    // Helper per rendere il messaggio live (errore rosso o conferma verde)
     const renderLiveFeedback = (name) => {
         if (!touched[name]) return null;
         const error = getLiveError(name);
@@ -137,28 +148,28 @@ export default function RegistrationForm() {
         <form className="reg-form" onSubmit={handleSubmit} noValidate>
             <h2>Registrazione Sviluppatore</h2>
 
-            {/* Nome completo */}
+            {/* Nome completo — NON controllato */}
             <div className="field">
                 <label htmlFor="fullName">Nome completo *</label>
                 <input
                     id="fullName"
                     type="text"
                     name="fullName"
-                    value={formData.fullName}
-                    onChange={handleChange}
+                    ref={fullNameRef}
+                    defaultValue=""
                     placeholder="Mario Rossi"
                 />
                 {errors.fullName && <span className="error">{errors.fullName}</span>}
             </div>
 
-            {/* Username con validazione live */}
+            {/* Username — CONTROLLATO */}
             <div className="field">
                 <label htmlFor="username">Username *</label>
                 <input
                     id="username"
                     type="text"
                     name="username"
-                    value={formData.username}
+                    value={controlled.username}
                     onChange={handleChange}
                     onBlur={handleBlur}
                     placeholder="dev_mario"
@@ -169,14 +180,14 @@ export default function RegistrationForm() {
                 )}
             </div>
 
-            {/* Password con validazione live */}
+            {/* Password — CONTROLLATO */}
             <div className="field">
                 <label htmlFor="password">Password *</label>
                 <input
                     id="password"
                     type="password"
                     name="password"
-                    value={formData.password}
+                    value={controlled.password}
                     onChange={handleChange}
                     onBlur={handleBlur}
                     placeholder="••••••••"
@@ -187,14 +198,14 @@ export default function RegistrationForm() {
                 )}
             </div>
 
-            {/* Specializzazione */}
+            {/* Specializzazione — NON controllato */}
             <div className="field">
                 <label htmlFor="specialization">Specializzazione *</label>
                 <select
                     id="specialization"
                     name="specialization"
-                    value={formData.specialization}
-                    onChange={handleChange}
+                    ref={specializationRef}
+                    defaultValue=""
                 >
                     <option value="">-- Seleziona --</option>
                     {SPECIALIZATIONS.map((spec) => (
@@ -204,35 +215,37 @@ export default function RegistrationForm() {
                 {errors.specialization && <span className="error">{errors.specialization}</span>}
             </div>
 
-            {/* Anni di esperienza */}
+            {/* Anni di esperienza — NON controllato */}
             <div className="field">
                 <label htmlFor="yearsOfExperience">Anni di esperienza *</label>
                 <input
                     id="yearsOfExperience"
                     type="number"
                     name="yearsOfExperience"
-                    value={formData.yearsOfExperience}
-                    onChange={handleChange}
+                    ref={yearsRef}
+                    defaultValue=""
                     min="0"
                     placeholder="es. 3"
                 />
-                {errors.yearsOfExperience && <span className="error">{errors.yearsOfExperience}</span>}
+                {errors.yearsOfExperience && (
+                    <span className="error">{errors.yearsOfExperience}</span>
+                )}
             </div>
 
-            {/* Descrizione con validazione live */}
+            {/* Descrizione — CONTROLLATO */}
             <div className="field">
                 <label htmlFor="description">Breve descrizione *</label>
                 <textarea
                     id="description"
                     name="description"
-                    value={formData.description}
+                    value={controlled.description}
                     onChange={handleChange}
                     onBlur={handleBlur}
                     rows="4"
                     placeholder="Raccontaci di te come sviluppatore..."
                 />
                 <small className="counter">
-                    {formData.description.trim().length} / 1000 caratteri (min. 100)
+                    {controlled.description.trim().length} / 1000 caratteri (min. 100)
                 </small>
                 {renderLiveFeedback('description')}
                 {!touched.description && errors.description && (
