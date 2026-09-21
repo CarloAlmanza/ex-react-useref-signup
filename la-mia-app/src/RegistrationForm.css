@@ -97,3 +97,28 @@
 .btn-secondary:active {
     transform: scale(0.98);
 }
+
+.success {
+    color: #10b981;
+    font-size: 0.8rem;
+    margin-top: 0.3rem;
+    font-weight: 500;
+}
+
+.counter {
+    color: #6b7280;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+/* Input valido = bordo verde */
+.field input.valid,
+.field textarea.valid {
+    border-color: #10b981;
+}
+
+/* Input invalido = bordo rosso */
+.field input.invalid,
+.field textarea.invalid {
+    border-color: #ef4444;
+}
